@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Signal Timing Fidget — Beacon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#3B86F2; --green:#5BCC3E; --green-lt:#77D860; --amber:#e8913a; --yellow:#F2C53B;
+    --red:#DC2626; --navy:#1B2A4A; --bg:#F8FAFC; --surface:#FFFFFF; --inset:#F1F5F9;
+    --divider:#E2E8F0; --border:#CBD5E1; --muted:#64748B; --body:#334155; --placeholder:#94A3B8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--body);
+    font-family:"Plus Jakarta Sans","Inter",system-ui,-apple-system,sans-serif;
+    font-size:16px; line-height:1.5; overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:520px; margin:0 auto; padding:20px 16px 40px;}
+  header{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+  header img{height:24px;}
+  header .tag{font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--placeholder); margin-left:auto;}
+  h1{font-size:21px; font-weight:700; color:var(--navy); margin:8px 0 2px;}
+  .sub{font-size:13px; color:var(--muted); margin:0 0 14px;}
+
+  .card{background:var(--surface); border-radius:16px; box-shadow:0 8px 24px rgba(15,23,42,0.10); padding:16px; margin-bottom:14px;}
+
+  /* dial */
+  .dial-wrap{position:relative; width:100%;}
+  svg.dial{width:100%; height:auto; display:block; touch-action:none;}
+  .handle{cursor:grab;}
+  .handle:active{cursor:grabbing;}
+
+  /* readout chips */
+  .readout{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px;}
+  .chip{background:var(--inset); border-radius:10px; padding:8px 12px; text-align:center; min-width:74px;}
+  .chip .v{font-size:18px; font-weight:700; color:var(--navy); line-height:1;}
+  .chip .l{font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); margin-top:4px;}
+  .chip.active{background:#EAF3FE;}
+  #phaseChip .v{color:var(--blue);}
+
+  /* controls */
+  .controls{display:flex; align-items:center; gap:12px; margin-top:4px;}
+  .btn{
+    height:44px; border:none; border-radius:8px; background:var(--blue); color:#fff;
+    font-family:inherit; font-size:16px; font-weight:500; padding:0 18px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:8px; transition:background .15s;
+  }
+  .btn:hover{background:#2f78e0;}
+  .btn:active{background:#2b6ccc;}
+  .btn.sec{background:transparent; color:var(--navy); border:1px solid var(--border);}
+  .btn.sec:hover{background:var(--inset);}
+  .speed{margin-left:auto; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);}
+  .speed button{width:34px; height:34px; border-radius:8px; border:1px solid var(--border); background:#fff; font-family:inherit; font-weight:600; color:var(--navy); cursor:pointer;}
+  .speed .sval{font-weight:700; color:var(--navy); min-width:30px; text-align:center;}
+
+  /* offset + progression */
+  .sectitle{font-size:13px; font-weight:600; color:var(--navy); margin:0 0 2px; display:flex; align-items:center; gap:8px;}
+  .sectitle .dir{font-size:11px; font-weight:600; color:var(--muted);}
+  .corridor{width:100%; height:auto; display:block; border-radius:10px; background:var(--inset); margin:8px 0 10px; touch-action:none;}
+  .offrow{display:flex; align-items:center; gap:12px;}
+  input[type=range]{ -webkit-appearance:none; appearance:none; flex:1; height:6px; border-radius:999px;
+    background:linear-gradient(90deg,#CBD5E1,#CBD5E1); outline:none;}
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%;
+    background:var(--blue); border:3px solid #fff; box-shadow:0 2px 6px rgba(15,23,42,.25); cursor:pointer;}
+  input[type=range]::-moz-range-thumb{ width:26px; height:26px; border-radius:50%; background:var(--blue); border:3px solid #fff; cursor:pointer;}
+  .offval{font-size:15px; font-weight:700; color:var(--navy); min-width:62px; text-align:right; font-variant-numeric:tabular-nums;}
+  .flow{display:flex; align-items:center; gap:10px; margin-top:10px;}
+  .flowbar{flex:1; height:10px; border-radius:999px; background:var(--divider); overflow:hidden;}
+  .flowfill{height:100%; width:0%; background:var(--green); transition:width .25s, background .25s;}
+  .flowpill{font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--inset); color:var(--muted); white-space:nowrap;}
+  .flowpill.good{background:#EAF7E6; color:#3f9e2c;}
+
+  .hint{font-size:12px; color:var(--muted); line-height:1.5; margin:10px 2px 0;}
+  .hint b{color:var(--body); font-weight:600;}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); margin-top:10px; justify-content:center;}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .dot{width:11px; height:11px; border-radius:3px; display:inline-block;}
+  footer{text-align:center; font-size:11px; color:var(--placeholder); margin-top:18px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="https://cdn.prod.website-files.com/68714144b0366e8f16bd3297/68714144b0366e8f16bd370d_Logo_horizontal.png" alt="Beacon">
+    <span class="tag">NEMA TS2 · Fidget</span>
+  </header>
+  <h1>Signal Timing Fidget</h1>
+  <p class="sub">Drag the split boundaries to give a movement more green. Run the cycle and watch the eastbound platoon respond.</p>
+
+  <div class="card">
+    <div class="dial-wrap">
+      <svg class="dial" id="dial" viewBox="0 0 400 400" aria-label="Cycle dial"></svg>
+    </div>
+    <div class="readout">
+      <div class="chip"><div class="v" id="cycVal">90</div><div class="l">Cycle (s)</div></div>
+      <div class="chip active" id="phaseChip"><div class="v" id="phaseVal">Φ2·6</div><div class="l">Active phase</div></div>
+      <div class="chip"><div class="v" id="tVal">0</div><div class="l">Clock (s)</div></div>
+    </div>
+    <div class="controls" style="margin-top:14px;">
+      <button class="btn" id="playBtn">▶ Run</button>
+      <button class="btn sec" id="resetBtn">Reset</button>
+      <div class="speed">
+        <button id="spDown">–</button><span class="sval" id="spVal">3×</span><button id="spUp">+</button>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--green)"></i>Green</span>
+      <span><i class="dot" style="background:var(--yellow)"></i>Yellow</span>
+      <span><i class="dot" style="background:var(--red)"></i>All-red</span>
+      <span><i class="dot" style="background:var(--blue)"></i>Clock hand</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="sectitle">Eastbound Progression <span class="dir">→</span></div>
+    <svg class="corridor" id="corridor" viewBox="0 0 480 120" aria-label="Platoon progression"></svg>
+    <div class="flow">
+      <div class="flowbar"><div class="flowfill" id="flowFill"></div></div>
+      <span class="flowpill" id="flowPill"></span>
+    </div>
+    <p class="hint" id="hint"><b>Try this:</b> press Run and watch the platoon stack up behind the red. Drag the white handles on the ring to give Φ2·6 (main through) more green — the queue thins out, the cars stream through, and the bar turns green when the platoon is flowing freely. The cycle length stays fixed, so more green here means less somewhere else.</p>
+  </div>
+
+  <footer>Beacon · a thoughtful little instrument · cycle · split · offset</footer>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ---------- Model: 4 NEMA stages around the ring (dual-ring barrier, simplified) ----------
+  // Each stage = concurrent phase pair. Coordinated phase is stage index 1 (Φ2+Φ6 main thru).
+  var YEL = 3, ARED = 2;              // fixed clearance intervals (s) — you don't "split" these
+  var stages = [
+    {id:'A', label:'Φ1·5', name:'Main lefts',  green:10, move:'NSL'},
+    {id:'B', label:'Φ2·6', name:'Main thru',   green:30, move:'NST'},  // coordinated
+    {id:'C', label:'Φ3·7', name:'Side lefts',  green:8,  move:'EWL'},
+    {id:'D', label:'Φ4·8', name:'Side thru',   green:22, move:'EWT'}
+  ];
+  var COORD = 1;
+  var DEFAULT = stages.map(function(s){return s.green;});
+
+  function stageDur(s){ return s.green + YEL + ARED; }
+  function cycle(){ var c=0; stages.forEach(function(s){c+=stageDur(s);}); return c; }
+
+  // cumulative start time (s) of each stage
+  function starts(){
+    var out=[], acc=0;
+    stages.forEach(function(s){ out.push(acc); acc+=stageDur(s); });
+    return out;
+  }
+
+  // given time-in-cycle t, return {idx, color, frac}
+  function stateAt(t){
+    var C=cycle(); t=((t%C)+C)%C;
+    var st=starts();
+    for(var i=0;i<stages.length;i++){
+      var s0=st[i], s=stages[i];
+      if(t < s0+s.green) return {idx:i, color:'green'};
+      if(t < s0+s.green+YEL) return {idx:i, color:'yellow'};
+      if(t < s0+s.green+YEL+ARED) return {idx:i, color:'red'};
+    }
+    return {idx:stages.length-1, color:'red'};
+  }
+
+  // ---------- Geometry ----------
+  var CX=200, CY=200, RO=178, RI=146;       // ring band
+  function pt(r,aDeg){ var a=(aDeg-90)*Math.PI/180; return [CX+r*Math.cos(a), CY+r*Math.sin(a)]; }
+  function ringSeg(ri,ro,a0,a1){
+    if(a1-a0<0.001) return '';
+    var large=(a1-a0)>180?1:0;
+    var po=pt(ro,a0), p1=pt(ro,a1), p2=pt(ri,a1), p3=pt(ri,a0);
+    return 'M'+po[0]+','+po[1]+' A'+ro+','+ro+' 0 '+large+' 1 '+p1[0]+','+p1[1]+
+           ' L'+p2[0]+','+p2[1]+' A'+ri+','+ri+' 0 '+large+' 0 '+p3[0]+','+p3[1]+' Z';
+  }
+  function deg(t){ return t/cycle()*360; }   // seconds -> degrees on the ring
+
+  var NS='http://www.w3.org/2000/svg';
+  function el(tag,attrs){ var e=document.createElementNS(NS,tag); for(var k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+  // ---------- State ----------
+  var t=0, playing=false, speed=3, last=null, dragHandle=-1;
+  var dial=document.getElementById('dial');
+  var corridor=document.getElementById('corridor');
+
+  // load saved prefs
+  try{
+    var saved=JSON.parse(localStorage.getItem('ts2fidget')||'null');
+    if(saved && saved.greens && saved.greens.length===4){
+      stages.forEach(function(s,i){ s.green=saved.greens[i]; });
+      if(typeof saved.speed==='number') speed=saved.speed;
+    }
+  }catch(e){}
+  function save(){
+    try{ localStorage.setItem('ts2fidget', JSON.stringify({
+      greens:stages.map(function(s){return s.green;}), speed:speed
+    })); }catch(e){}
+  }
+
+  // ---------- Build static dial scaffold (ticks) once ----------
+  function buildTicks(){
+    var g=el('g',{});
+    // outer ring backdrop
+    g.appendChild(el('circle',{cx:CX,cy:CY,r:RO+8,fill:'none',stroke:'#E2E8F0','stroke-width':1}));
+    g.appendChild(el('circle',{cx:CX,cy:CY,r:RI-8,fill:'none',stroke:'#E2E8F0','stroke-width':1}));
+    return g;
+  }
+
+  // ---------- Center intersection diagram ----------
+  // movement arrows keyed by code; we light the active stage's movement set
+  function arrow(x1,y1,x2,y2,color,on){
+    var gg=el('g',{});
+    var w=on?4:2.4, op=on?1:0.28;
+    var ln=el('line',{x1:x1,y1:y1,x2:x2,y2:y2,stroke:color,'stroke-width':w,'stroke-linecap':'round',opacity:op});
+    gg.appendChild(ln);
+    // arrowhead
+    var ang=Math.atan2(y2-y1,x2-x1), L=8;
+    [-0.5,0.5].forEach(function(d){
+      gg.appendChild(el('line',{x1:x2,y1:y2,
+        x2:x2-L*Math.cos(ang-d), y2:y2-L*Math.sin(ang-d),
+        stroke:color,'stroke-width':w,'stroke-linecap':'round',opacity:op}));
+    });
+    return gg;
+  }
+
+  function buildCenter(stIdx, color){
+    var g=el('g',{});
+    var c=(color==='green')?getCss('--green'):(color==='yellow')?getCss('--yellow'):getCss('--red');
+    // roads (cross). Main street = vertical (N-S). Side street = horizontal (E-W).
+    g.appendChild(el('rect',{x:CX-22,y:CY-86,width:44,height:172,rx:4,fill:'#EEF2F7'}));   // vertical road
+    g.appendChild(el('rect',{x:CX-86,y:CY-22,width:172,height:44,rx:4,fill:'#EEF2F7'}));   // horizontal road
+    // center box
+    g.appendChild(el('rect',{x:CX-22,y:CY-22,width:44,height:44,fill:'#E7ECF3'}));
+    // lane dashes
+    g.appendChild(el('line',{x1:CX,y1:CY-86,x2:CX,y2:CY+86,stroke:'#CBD5E1','stroke-width':1,'stroke-dasharray':'4 5'}));
+    g.appendChild(el('line',{x1:CX-86,y1:CY,x2:CX+86,y2:CY,stroke:'#CBD5E1','stroke-width':1,'stroke-dasharray':'4 5'}));
+
+    var mv=stages[stIdx].move;
+    var dim=getCss('--placeholder');
+    // Through movements: NS thru (vertical), EW thru (horizontal)
+    var nst = mv==='NST', ewt = mv==='EWT', nsl = mv==='NSL', ewl = mv==='EWL';
+    // N-S through (two opposing): southbound (top->down) and northbound (bottom->up)
+    g.appendChild(arrow(CX-9,CY-78,CX-9,CY+78, nst?c:dim, nst));   // SB through
+    g.appendChild(arrow(CX+9,CY+78,CX+9,CY-78, nst?c:dim, nst));   // NB through
+    // E-W through
+    g.appendChild(arrow(CX-78,CY+9,CX+78,CY+9, ewt?c:dim, ewt));   // EB through
+    g.appendChild(arrow(CX+78,CY-9,CX-78,CY-9, ewt?c:dim, ewt));   // WB through
+    // N-S protected lefts (curving) — draw as short diagonal turn arrows
+    g.appendChild(arrow(CX+15,CY+70,CX-30,CY+30, nsl?c:dim, nsl)); // NB left
+    g.appendChild(arrow(CX-15,CY-70,CX+30,CY-30, nsl?c:dim, nsl)); // SB left
+    // E-W protected lefts
+    g.appendChild(arrow(CX-70,CY-15,CX-30,CY+30, ewl?c:dim, ewl)); // WB left
+    g.appendChild(arrow(CX+70,CY+15,CX+30,CY-30, ewl?c:dim, ewl)); // EB left
+
+    // center label
+    var lab=el('text',{x:CX,y:CY-2,'text-anchor':'middle','font-size':12,'font-weight':700,fill:getCss('--navy'),'font-family':'inherit'});
+    lab.textContent='NEMA'; g.appendChild(lab);
+    var lab2=el('text',{x:CX,y:CY+12,'text-anchor':'middle','font-size':12,'font-weight':700,fill:getCss('--navy'),'font-family':'inherit'});
+    lab2.textContent='TS2'; g.appendChild(lab2);
+    return g;
+  }
+
+  var cssCache={};
+  function getCss(v){ if(cssCache[v]) return cssCache[v]; cssCache[v]=getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return cssCache[v]; }
+
+  // ---------- Render the dial ----------
+  function renderDial(){
+    while(dial.firstChild) dial.removeChild(dial.firstChild);
+    dial.appendChild(buildTicks());
+
+    var st=starts();
+    var colGreen=getCss('--green'), colYel=getCss('--yellow'), colRed=getCss('--red');
+    // arcs
+    stages.forEach(function(s,i){
+      var a0=deg(st[i]);
+      var ag=deg(st[i]+s.green);
+      var ay=deg(st[i]+s.green+YEL);
+      var ar=deg(st[i]+s.green+YEL+ARED);
+      dial.appendChild(pathSeg(ringSeg(RI,RO,a0,ag),colGreen));
+      dial.appendChild(pathSeg(ringSeg(RI,RO,ag,ay),colYel));
+      dial.appendChild(pathSeg(ringSeg(RI,RO,ay,ar),colRed));
+      // stage label near mid of green
+      var mid=(a0+ag)/2;
+      var lp=pt((RI+RO)/2, mid);
+      var tx=el('text',{x:lp[0],y:lp[1]+4,'text-anchor':'middle','font-size':12,'font-weight':700,
+                        fill:'#fff','font-family':'inherit','pointer-events':'none'});
+      tx.textContent=s.label; dial.appendChild(tx);
+      // green seconds just outside
+      var op=pt(RO+20, mid);
+      var gs=el('text',{x:op[0],y:op[1]+4,'text-anchor':'middle','font-size':11,'font-weight':600,
+                        fill:getCss('--muted'),'font-family':'inherit'});
+      gs.textContent=s.green+'s'; dial.appendChild(gs);
+    });
+
+    // draggable boundary handles at end of each stage (= start of next green)
+    st.forEach(function(s0,i){
+      var bAng=deg(starts()[i]); // start of stage i green
+      var hp=pt((RI+RO)/2, bAng);
+      var h=el('circle',{cx:hp[0],cy:hp[1],r:9,fill:'#fff',stroke:getCss('--navy'),'stroke-width':2,
+                         class:'handle','data-i':i});
+      dial.appendChild(h);
+      var hi=el('circle',{cx:hp[0],cy:hp[1],r:3.2,fill:getCss('--navy'),'pointer-events':'none'});
+      dial.appendChild(hi);
+    });
+
+    // clock hand
+    var hAng=deg(t);
+    var hp1=pt(RI-12,hAng), hp2=pt(RO+4,hAng);
+    dial.appendChild(el('line',{x1:CX,y1:CY,x2:hp2[0],y2:hp2[1],stroke:getCss('--blue'),'stroke-width':3,'stroke-linecap':'round','pointer-events':'none'}));
+    dial.appendChild(el('circle',{cx:hp2[0],cy:hp2[1],r:5,fill:getCss('--blue'),'pointer-events':'none'}));
+    dial.appendChild(el('circle',{cx:CX,cy:CY,r:4,fill:getCss('--blue'),'pointer-events':'none'}));
+
+    // center intersection
+    var s=stateAt(t);
+    dial.appendChild(buildCenter(s.idx, s.color));
+
+    bindHandles();
+  }
+  function pathSeg(d,fill){ return el('path',{d:d,fill:fill,'pointer-events':'none'}); }
+
+  // ---------- Readouts ----------
+  function updateReadouts(){
+    document.getElementById('cycVal').textContent=cycle();
+    document.getElementById('tVal').textContent=Math.floor(((t%cycle())+cycle())%cycle());
+    var s=stateAt(t);
+    document.getElementById('phaseVal').textContent=stages[s.idx].label;
+    var pc=document.getElementById('phaseChip');
+    pc.style.background = s.color==='green'?'#EAF7E6':s.color==='yellow'?'#FCF3DC':'#FBE9E9';
+    document.getElementById('phaseVal').style.color =
+      s.color==='green'?'#3f9e2c':s.color==='yellow'?'#b9842a':getCss('--red');
+  }
+
+  // ---------- Dragging split boundaries ----------
+  function angleFromEvent(ev){
+    var rect=dial.getBoundingClientRect();
+    var cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+    var p=(ev.touches&&ev.touches[0])||ev;
+    var dx=p.clientX-cx, dy=p.clientY-cy;
+    var a=Math.atan2(dy,dx)*180/Math.PI + 90; // 0 at top, clockwise
+    a=((a%360)+360)%360;
+    return a;
+  }
+  function bindHandles(){
+    var hs=dial.querySelectorAll('.handle');
+    hs.forEach(function(h){
+      h.addEventListener('pointerdown', function(ev){
+        ev.preventDefault();
+        dragHandle=+h.getAttribute('data-i');
+        h.setPointerCapture && h.setPointerCapture(ev.pointerId);
+      });
+    });
+  }
+  function onMove(ev){
+    if(dragHandle<0) return;
+    ev.preventDefault();
+    // boundary i sits at start of stage i; dragging trades green between stage (i-1) and stage i
+    var i=dragHandle, prev=(i-1+stages.length)%stages.length;
+    var a=angleFromEvent(ev);
+    var tSec=a/360*cycle();                 // desired absolute time of this boundary
+    var st=starts();
+    // current boundary time = st[i]; the block before it is stage prev (ends at st[i]).
+    // stage prev occupies [st[prev], st[i]]; moving boundary changes prev.green and stage i.green.
+    var lo = st[prev] + 4 + YEL + ARED;     // min so prev keeps >=4s green
+    var maxBoundary = st[i] + (stages[i].green - 4); // so stage i keeps >=4s green
+    // handle wrap for i==0 (boundary at top / t=0): skip trading across the 0 seam for simplicity
+    if(i===0){ dragHandle=-1; return; }
+    tSec=Math.max(lo, Math.min(maxBoundary, tSec));
+    var deltaPrevGreen = tSec - st[i];      // +: prev grows, i shrinks
+    stages[prev].green = Math.round(stages[prev].green + deltaPrevGreen);
+    stages[i].green    = Math.round(stages[i].green - deltaPrevGreen);
+    renderDial(); updateReadouts(); save();
+  }
+  function onUp(){ if(dragHandle>=0){ dragHandle=-1; } }
+  window.addEventListener('pointermove', onMove, {passive:false});
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+
+  // ---------- Corridor / platoon progression ----------
+  var dots=[];
+  var SX=300;              // stop-bar x in corridor viewBox (480 wide)
+  var DOTV=46;             // px/sec at 1x
+  var GAP=22;              // min center-to-center spacing (no overlap; cars are r=6.5)
+  var STOPMARGIN=12;       // lead car stops this far before the bar
+  var NCARS=7;
+  var flowSmooth=0;        // EMA of flow for a calm bar
+  var gwState=false;       // hysteresis latch for the green-wave indicator (kills jitter)
+  function initDots(){
+    dots=[];
+    for(var i=0;i<NCARS;i++){ dots.push({x: -20 - i*44, stopped:false, passedGreen:false}); }
+  }
+  initDots();
+
+  function coordColorAt(time){
+    // color this approach sees = the Φ2·6 (main through) phase color; red during all other phases
+    var s=stateAt(time);
+    if(s.idx===COORD) return s.color;
+    return 'red';
+  }
+
+  function renderCorridor(){
+    while(corridor.firstChild) corridor.removeChild(corridor.firstChild);
+    // road
+    corridor.appendChild(el('rect',{x:0,y:48,width:480,height:36,fill:'#E3E8EF'}));
+    corridor.appendChild(el('line',{x1:0,y1:66,x2:480,y2:66,stroke:'#fff','stroke-width':2,'stroke-dasharray':'10 9'}));
+    // signal head at stop bar
+    var col=coordColorAt(t);
+    var cc = col==='green'?getCss('--green'):col==='yellow'?getCss('--yellow'):getCss('--red');
+    corridor.appendChild(el('line',{x1:SX,y1:44,x2:SX,y2:88,stroke:'#fff','stroke-width':3}));      // stop bar
+    corridor.appendChild(el('rect',{x:SX-9,y:14,width:18,height:30,rx:4,fill:getCss('--navy')}));   // signal box
+    ['red','yellow','green'].forEach(function(cname,k){
+      var on = (col===cname);
+      var fill = on ? (cname==='green'?getCss('--green'):cname==='yellow'?getCss('--yellow'):getCss('--red')) : '#3a4a68';
+      corridor.appendChild(el('circle',{cx:SX,cy:21+k*9, r:3.4, fill:fill}));
+    });
+    corridor.appendChild(el('rect',{x:SX-13,y:8,width:26,height:6,rx:2,fill:getCss('--navy')})); // visor
+    // direction label
+    var dl=el('text',{x:8,y:104,'font-size':11,'font-weight':600,fill:getCss('--muted'),'font-family':'inherit'});
+    dl.textContent='Φ2·6 main-through approach'; corridor.appendChild(dl);
+
+    // platoon dots
+    dots.forEach(function(d){
+      var fill = d.stopped ? getCss('--red') : (d.passedGreen?getCss('--green'):getCss('--blue'));
+      corridor.appendChild(el('circle',{cx:d.x,cy:66,r:6.5,fill:fill,stroke:'#fff','stroke-width':1.5}));
+    });
+  }
+
+  function stepDots(dt){
+    var col=coordColorAt(t);
+    var canGo = (col==='green' || col==='yellow');  // proceed on green/yellow; queue on red
+    var v=DOTV*speed*dt;
+    // process the front car first so followers can close up smoothly without overlapping
+    dots.sort(function(a,b){ return b.x-a.x; });
+    var movers=0;
+    for(var i=0;i<dots.length;i++){
+      var d=dots[i];
+      var prevX=d.x;
+      var target=d.x+v;
+      // don't run into the car ahead — collapse toward it but hold one car-gap
+      if(i>0){ target=Math.min(target, dots[i-1].x - GAP); }
+      // stop at the bar when the approach is red
+      if(!canGo && d.x <= SX){ target=Math.min(target, SX - STOPMARGIN); }
+      // mark a clean crossing while green
+      if(canGo && prevX < SX && target >= SX){ d.passedGreen=true; }
+      if(target < prevX) target=prevX;             // never reverse
+      var adv=target-prevX;
+      d.x=target;
+      d.stopped = (adv < v*0.15) && (d.x < SX);     // essentially halted while still upstream of the bar
+      if(!d.stopped) movers++;
+    }
+    // recycle cars that have left the scene to the back of the platoon (keeps even spacing)
+    var minx=Math.min.apply(null, dots.map(function(d){return d.x;}));
+    dots.forEach(function(d){
+      if(d.x>512){ minx-=GAP*2; d.x=minx; d.passedGreen=false; d.stopped=false; }
+    });
+
+    // ---- flow bar (smoothed) + green-wave pill (de-jittered) ----
+    var inst=movers/dots.length;
+    flowSmooth += (inst-flowSmooth)*0.12;
+    // hysteresis: latch ON only while green with full flow; latch OFF when flow drops.
+    // The gap between thresholds + the EMA means no boundary flicker.
+    if(!gwState && flowSmooth>=0.85 && col==='green') gwState=true;
+    else if(gwState && flowSmooth<0.70) gwState=false;
+
+    var fill=document.getElementById('flowFill');
+    fill.style.width=Math.round(flowSmooth*100)+'%';
+    fill.style.background = gwState ? getCss('--green') : getCss('--red');
+    var pill=document.getElementById('flowPill');
+    if(gwState){ pill.textContent='Green wave'; pill.className='flowpill good'; pill.style.display=''; }
+    else { pill.textContent=''; pill.className='flowpill'; pill.style.display='none'; }
+  }
+
+  // ---------- Animation loop ----------
+  function frame(ts){
+    if(!last) last=ts;
+    var dt=Math.min(0.05,(ts-last)/1000); last=ts;
+    if(playing){
+      t += dt*speed;
+      if(t>=cycle()) t-=cycle();
+      stepDots(dt);
+      renderDial(); updateReadouts(); renderCorridor();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Controls ----------
+  var playBtn=document.getElementById('playBtn');
+  playBtn.addEventListener('click', function(){
+    playing=!playing; last=null;
+    playBtn.textContent = playing?'❚❚ Pause':'▶ Run';
+  });
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    stages.forEach(function(s,i){ s.green=DEFAULT[i]; });
+    t=0; flowSmooth=0; gwState=false; initDots();
+    renderDial(); updateReadouts(); renderCorridor(); save();
+  });
+  function setSpeed(v){ speed=Math.max(1,Math.min(8,v)); document.getElementById('spVal').textContent=speed+'×'; save(); }
+  document.getElementById('spUp').addEventListener('click', function(){ setSpeed(speed+1); });
+  document.getElementById('spDown').addEventListener('click', function(){ setSpeed(speed-1); });
+  // tap the dial (not on a handle) to scrub time when paused
+  dial.addEventListener('pointerdown', function(ev){
+    if(dragHandle>=0) return;
+    if(ev.target.classList && ev.target.classList.contains('handle')) return;
+    if(playing) return;
+    var a=angleFromEvent(ev);
+    t=a/360*cycle();
+    renderDial(); updateReadouts(); renderCorridor();
+  });
+
+  // ---------- Init ----------
+  document.getElementById('spVal').textContent=speed+'×';
+  renderDial(); updateReadouts(); renderCorridor();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
